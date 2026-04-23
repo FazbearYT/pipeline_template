@@ -1,0 +1,5 @@
+aiohttp>=3.11.5
+numpy
+matplotlib
+telebot
+sqlite3

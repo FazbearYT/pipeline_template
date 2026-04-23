@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import aiohttp
 
 # 1. Исходные данные (из расчетов выше)
 # Масса (кг)
