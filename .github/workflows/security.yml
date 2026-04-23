@@ -36,9 +36,8 @@ jobs:
             --config p/security-audit \
             --sarif \
             --output semgrep.sarif \
-            --error \
-            --quiet || true
-        continue-on-error: true
+            --quiet
+        continue-on-error: ${{ github.event_name != 'pull_request' }}
 
       # ==================== 2. Secret Scanning ====================
       - name: 🕵️ Run Gitleaks
@@ -51,7 +50,7 @@ jobs:
             --report-format=sarif
             --report-path=gitleaks-results.sarif
             --log-level=warn
-            --exit-code=0
+            --exit-code=${{ github.event_name == 'pull_request' && '2' || '0' }}
 
       - name: 🔑 Run Trivy Secret Scan
         uses: aquasecurity/trivy-action@master
@@ -61,7 +60,7 @@ jobs:
           scanners: 'secret'
           format: 'sarif'
           output: 'trivy-secrets.sarif'
-          exit-code: '0'
+          exit-code: ${{ github.event_name == 'pull_request' && '1' || '0' }}
           severity: 'CRITICAL,HIGH'
 
       # ==================== 3. SCA (Trivy) ====================
@@ -75,7 +74,7 @@ jobs:
           format: 'sarif'
           output: 'trivy-sca-python.sarif'
           severity: 'CRITICAL,HIGH'
-          exit-code: '0'
+          exit-code: ${{ github.event_name == 'pull_request' && '1' || '0' }}
 
       - name: 📦 Run Trivy SCA (Go)
         if: ${{ hashFiles('go.mod') != '' }}
@@ -87,7 +86,7 @@ jobs:
           format: 'sarif'
           output: 'trivy-sca-go.sarif'
           severity: 'CRITICAL,HIGH'
-          exit-code: '0'
+          exit-code: ${{ github.event_name == 'pull_request' && '1' || '0' }}
 
       - name: 📦 Run Trivy SCA (C/C++)
         if: ${{ hashFiles('conan.lock') != '' || hashFiles('vcpkg.json') != '' }}
@@ -99,7 +98,7 @@ jobs:
           format: 'sarif'
           output: 'trivy-sca-cpp.sarif'
           severity: 'CRITICAL,HIGH'
-          exit-code: '0'
+          exit-code: ${{ github.event_name == 'pull_request' && '1' || '0' }}
 
       # ==================== 4. Upload Results to GitHub ====================
       - name: 📤 Upload Semgrep SARIF
