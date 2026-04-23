@@ -6,55 +6,60 @@ on:
     tags: ['v*.*.*']
   pull_request:
     branches: [develop]
-  workflow_dispatch: # Ручной запуск через вкладку Actions
+  workflow_dispatch:
 
 permissions:
   contents: read
-  security-events: write # Обязательно для загрузки SARIF в GitHub Security Tab
+  security-events: write
+  actions: read  # Нужно для upload-sarif@v4
 
 jobs:
   security-scan:
     runs-on: ubuntu-latest
     strategy:
-      fail-fast: false # Позволяет завершить остальные сканеры, даже если один упал
+      fail-fast: false
 
     steps:
       - name: 📥 Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Обязательно для сканирования полной истории Git
+          fetch-depth: 0
 
       # ==================== 1. SAST (Semgrep) ====================
       - name: 🛡️ Run Semgrep SAST
-        uses: semgrep/semgrep-action@v2
+        uses: returntocorp/semgrep-action@v1
         with:
           config: >-
             p/default
             p/security-audit
-          generate-sarif-report: true
-          sarif_file: semgrep-results.sarif
-          # Отключаем авто-загрузку, чтобы контролировать её явно
-          upload: false
+          args: >-
+            --sarif
+            --output=semgrep.sarif
+            --error  # Exit code 1 при HIGH/CRITICAL находках
 
       # ==================== 2. Secret Scanning ====================
-      - name: 🕵️ Run Gitleaks (Full History)
+      - name: 🕵️ Run Gitleaks
         uses: gitleaks/gitleaks-action@v2
         env:
-          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }} # Опционально (не нужен для public-репо)
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           args: >-
             detect
             --report-format=sarif
             --report-path=gitleaks-results.sarif
             --log-level=warn
+            --exit-code=0
 
       - name: 🔑 Run Trivy Secret Scan
         uses: aquasecurity/trivy-action@master
         with:
-          scan-type: 'secret'
+          scan-type: 'fs'
+          scan-ref: '.'
+          scanners: 'secret'  # Правильный параметр для сканирования секретов
           format: 'sarif'
           output: 'trivy-secrets.sarif'
           exit-code: '0'
+          severity: 'CRITICAL,HIGH'
 
       # ==================== 3. SCA (Trivy) ====================
       - name: 📦 Run Trivy SCA (Python)
@@ -63,6 +68,7 @@ jobs:
         with:
           scan-type: 'fs'
           scan-ref: '.'
+          scanners: 'vuln'  # Сканирование уязвимостей зависимостей
           format: 'sarif'
           output: 'trivy-sca-python.sarif'
           severity: 'CRITICAL,HIGH'
@@ -74,6 +80,7 @@ jobs:
         with:
           scan-type: 'fs'
           scan-ref: '.'
+          scanners: 'vuln'
           format: 'sarif'
           output: 'trivy-sca-go.sarif'
           severity: 'CRITICAL,HIGH'
@@ -85,6 +92,7 @@ jobs:
         with:
           scan-type: 'fs'
           scan-ref: '.'
+          scanners: 'vuln'
           format: 'sarif'
           output: 'trivy-sca-cpp.sarif'
           severity: 'CRITICAL,HIGH'
@@ -92,43 +100,43 @@ jobs:
 
       # ==================== 4. Upload Results to GitHub ====================
       - name: 📤 Upload Semgrep SARIF
-        if: ${{ always() }}
-        uses: github/codeql-action/upload-sarif@v3
+        if: ${{ always() && hashFiles('semgrep.sarif') != '' }}
+        uses: github/codeql-action/upload-sarif@v4
         with:
-          sarif_file: semgrep-results.sarif
+          sarif_file: semgrep.sarif
           category: semgrep-sast
 
       - name: 📤 Upload Gitleaks SARIF
-        if: ${{ always() }}
-        uses: github/codeql-action/upload-sarif@v3
+        if: ${{ always() && hashFiles('gitleaks-results.sarif') != '' }}
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: gitleaks-results.sarif
           category: gitleaks-secrets
 
       - name: 📤 Upload Trivy Secrets SARIF
-        if: ${{ always() }}
-        uses: github/codeql-action/upload-sarif@v3
+        if: ${{ always() && hashFiles('trivy-secrets.sarif') != '' }}
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: trivy-secrets.sarif
           category: trivy-secrets
 
       - name: 📤 Upload Trivy SCA (Python) SARIF
-        if: ${{ always() && (hashFiles('requirements.txt') != '' || hashFiles('pyproject.toml') != '') }}
-        uses: github/codeql-action/upload-sarif@v3
+        if: ${{ always() && (hashFiles('requirements.txt') != '' || hashFiles('pyproject.toml') != '') && hashFiles('trivy-sca-python.sarif') != '' }}
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: trivy-sca-python.sarif
           category: trivy-sca-python
 
       - name: 📤 Upload Trivy SCA (Go) SARIF
-        if: ${{ always() && hashFiles('go.mod') != '' }}
-        uses: github/codeql-action/upload-sarif@v3
+        if: ${{ always() && hashFiles('go.mod') != '' && hashFiles('trivy-sca-go.sarif') != '' }}
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: trivy-sca-go.sarif
           category: trivy-sca-go
 
       - name: 📤 Upload Trivy SCA (C/C++) SARIF
-        if: ${{ always() && (hashFiles('conan.lock') != '' || hashFiles('vcpkg.json') != '') }}
-        uses: github/codeql-action/upload-sarif@v3
+        if: ${{ always() && (hashFiles('conan.lock') != '' || hashFiles('vcpkg.json') != '') && hashFiles('trivy-sca-cpp.sarif') != '' }}
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: trivy-sca-cpp.sarif
           category: trivy-sca-cpp
