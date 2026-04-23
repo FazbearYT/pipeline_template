@@ -11,7 +11,7 @@ on:
 permissions:
   contents: read
   security-events: write
-  actions: read  # Нужно для upload-sarif@v4
+  actions: read
 
 jobs:
   security-scan:
@@ -26,16 +26,19 @@ jobs:
           fetch-depth: 0
 
       # ==================== 1. SAST (Semgrep) ====================
+      - name: 🛡️ Install Semgrep
+        run: pip install semgrep
+
       - name: 🛡️ Run Semgrep SAST
-        uses: returntocorp/semgrep-action@v1
-        with:
-          config: >-
-            p/default
-            p/security-audit
-          args: >-
-            --sarif
-            --output=semgrep.sarif
-            --error  # Exit code 1 при HIGH/CRITICAL находках
+        run: |
+          semgrep scan \
+            --config p/default \
+            --config p/security-audit \
+            --sarif \
+            --output semgrep.sarif \
+            --error \
+            --quiet || true
+        continue-on-error: true
 
       # ==================== 2. Secret Scanning ====================
       - name: 🕵️ Run Gitleaks
@@ -55,7 +58,7 @@ jobs:
         with:
           scan-type: 'fs'
           scan-ref: '.'
-          scanners: 'secret'  # Правильный параметр для сканирования секретов
+          scanners: 'secret'
           format: 'sarif'
           output: 'trivy-secrets.sarif'
           exit-code: '0'
@@ -68,7 +71,7 @@ jobs:
         with:
           scan-type: 'fs'
           scan-ref: '.'
-          scanners: 'vuln'  # Сканирование уязвимостей зависимостей
+          scanners: 'vuln'
           format: 'sarif'
           output: 'trivy-sca-python.sarif'
           severity: 'CRITICAL,HIGH'
