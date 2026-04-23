@@ -1,54 +1,37 @@
-import telebot
-import sqlite3
 import os
+import sqlite3
+import subprocess
 
-# токен бота не в env
-
-
-BOT_TOKEN = "5240018753:AAH-9-YXLggScFMGHiIYB0q7zyoS2Fuk85c"
-
-
-# BOT_TOKEN = os.getenv("MY_BOT_TOKEN")
-
-
-
-bot = telebot.TeleBot(BOT_TOKEN)
-
-# подключаемся к базе
-conn = sqlite3.connect('logs.db', check_same_thread=False)
-cursor = conn.cursor()
-cursor.execute("CREATE TABLE IF NOT EXISTS messages (user_id INTEGER, text TEXT)")
-conn.commit()
+# 1. SECRET SCANNING TRIGGER
+# Gitleaks ищет паттерны AKIA... (AWS Access Keys)
+# Этот ключ не настоящий, но формат сработает как "утечка"
+AWS_ACCESS_KEY = "AKIAIOSFODNN7EXAMPLE"
+AWS_SECRET_KEY = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
 
 
-def save_to_db(user_id, text):
-    # плохой вариант, может быть инъекция
+def get_user_data(username):
+    conn = sqlite3.connect('test.db')
+    cursor = conn.cursor()
 
-
-    query = f"INSERT INTO messages (user_id, text) VALUES ({user_id}, '{text}')"
+    # 2. SAST TRIGGER (SQL Injection)
+    # Semgrep ищет f-строки внутри cursor.execute
+    # Это классическая уязвимость CWE-89
+    query = f"SELECT * FROM users WHERE username = '{username}'"
     cursor.execute(query)
 
-
-    # правильный вариант
-
-
-    # query = "INSERT INTO messages (user_id, text) VALUES (?, ?)"
-    # cursor.execute(query, (user_id, text))
-
-    conn.commit()
+    return cursor.fetchone()
 
 
-@bot.message_handler(commands=['start'])
-def start(message):
-    bot.reply_to(message, "Привет! Я зеркало. Напиши мне что-нибудь.")
+def process_file(filename):
+    # 3. SAST TRIGGER (Command Injection)
+    # Semgrep/CodeQL ищут os.system с f-строками или конкатенацией
+    # Это позволяет выполнить любой код в системе (CWE-78)
+    os.system(f"cat {filename}")
 
-
-@bot.message_handler(content_types=['text'])
-def mirror(message):
-    save_to_db(message.from_user.id, message.text)
-    bot.reply_to(message, message.text)
+    # Альтернативный вариант, который тоже ловится:
+    # subprocess.call(f"ls -la {filename}", shell=True)
 
 
 if __name__ == "__main__":
-    print("Запущено!")
-    bot.infinity_polling()
+    print("Этот файл создан для тестирования CI/CD пайплайна")
+    print("В нём заведомо есть уязвимости!")
