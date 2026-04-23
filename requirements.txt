@@ -1,5 +1,4 @@
-aiohttp>=3.11.5
-numpy
-matplotlib
-telebot
-sqlite3
+aiohttp==3.9.1  # Уязвимая версия с CVE
+numpy==1.26.3
+matplotlib==3.8.2
+pyTelegramBotAPI==4.15.4
