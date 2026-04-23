@@ -1,0 +1,19 @@
+# Исключаем тесты, вендоры, билд-артефакты и виртуальные окружения
+tests/
+test/
+__pycache__/
+.idea/
+.venv/
+env/
+venv/
+node_modules/
+vendor/
+build/
+dist/
+*.egg-info/
+*.pyc
+*.o
+*.a
+*.so
+*.exe
+*.dll

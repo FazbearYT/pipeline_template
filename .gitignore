@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+
+# ML / Data
+*.ipynb_checkpoints/
+*.h5
+*.pt
+*.pkl
+.env
+secrets.json
+config.local.yaml
+
+# C/C++
+cmake-build-*/
+*.o
+*.a
+*.so
+*.exe
+*.dll
+*.pdb
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
